@@ -1,0 +1,10 @@
+.wallet-badge {
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  background: #eef;
+}
+
+.wallet-badge.not-connected {
+  background: #fee;
+}

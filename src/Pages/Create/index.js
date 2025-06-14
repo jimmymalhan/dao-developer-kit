@@ -7,10 +7,12 @@ import {
   Stack,
   TextareaAutosize,
   useMediaQuery,
+  CircularProgress,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import { useNavigate } from "react-router-dom";
 import { pinFileToIPFS } from "../../Utils/pinata";
+import { isValidCID } from "../../Utils/ipfsHelpers";
 import { useSelector } from "react-redux";
 import Web3 from "web3";
 import { RPC, daoABI, daoAddress } from "../../Constants/config";
@@ -26,6 +28,9 @@ class Create extends React.Component {
       owner: "",
       admin: "",
       preview: "",
+      loading: false,
+      error: "",
+      success: ""
     };
     this.handleContent = this.handleContent.bind(this);
     this.handleFile = this.handleFile.bind(this);
@@ -58,38 +63,86 @@ class Create extends React.Component {
 
   async handleCreate(e) {
     e.preventDefault();
-    console.log(this.state);
-    if (this.state.owner === "") return;
-    if (this.state.admin === "") return;
+    
+    this.setState({ loading: true, error: "", success: "" });
+    
+    try {
+      // Input validation
+      if (!this.state.content) {
+        this.setState({ error: "Please enter election content", loading: false });
+        return;
+      }
+      
+      if (!this.state.files || !this.state.files.length) {
+        this.setState({ error: "Please select an image file", loading: false });
+        return;
+      }
+      
+      // Permission check
+      if (this.state.owner === "" || this.state.admin === "") {
+        this.setState({ error: "Contract owner or admin not found", loading: false });
+        return;
+      }
 
-    if (
-      this.state.owner !== "" &&
-      this.state.owner !== this.props.account &&
-      this.state.admin !== "" &&
-      this.state.admin !== this.props.account
-    )
-      return;
-    const response = await pinFileToIPFS(this.state.files[0]);
+      // Check if user has permission to create proposals
+      if (
+        this.state.owner !== "" &&
+        this.state.owner !== this.props.account &&
+        this.state.admin !== "" &&
+        this.state.admin !== this.props.account
+      ) {
+        this.setState({ error: "You do not have permission to create proposals", loading: false });
+        return;
+      }
+      
+      // Upload to IPFS via Pinata
+      const response = await pinFileToIPFS(this.state.files[0]);
 
-    if (response.success) {
-      await window.ethereum.request({
-        method: "wallet_switchEthereumChain",
-        params: [{ chainId: web3.utils.toHex(1666600000) }],
-      });
-
-      const linkedContract = new window.web3.eth.Contract(daoABI, daoAddress);
-      await linkedContract.methods
-        .createProposal(this.state.content + "", response.pinataUrl + "")
-        .send({ from: this.props.account })
-        .once("confirmation", async () => {
-          this.props.navigate("/elections");
+      if (response.success) {
+        // Validate the returned CID
+        if (!isValidCID(response.pinataUrl)) {
+          this.setState({ 
+            error: "Invalid IPFS CID received from Pinata", 
+            loading: false 
+          });
+          return;
+        }
+        
+        this.setState({ success: "Image uploaded to IPFS successfully" });
+        
+        // Switch to the correct chain if needed
+        await window.ethereum.request({
+          method: "wallet_switchEthereumChain",
+          params: [{ chainId: web3.utils.toHex(1666600000) }],
         });
-    } else {
-      return false;
+
+        // Create the proposal
+        const linkedContract = new window.web3.eth.Contract(daoABI, daoAddress);
+        await linkedContract.methods
+          .createProposal(this.state.content, response.pinataUrl)
+          .send({ from: this.props.account })
+          .once("confirmation", async () => {
+            this.setState({ success: "Proposal created successfully!", loading: false });
+            this.props.navigate("/elections");
+          });
+      } else {
+        this.setState({ 
+          error: response.message || "Failed to upload image to IPFS", 
+          loading: false 
+        });
+      }
+    } catch (err) {
+      console.error("Error creating proposal:", err);
+      this.setState({ 
+        error: `Error: ${err.message}`, 
+        loading: false 
+      });
     }
   }
 
   render() {
+    const { loading, error, success } = this.state;
+    
     return (
       <Box
         sx={{
@@ -98,6 +151,23 @@ class Create extends React.Component {
           bgcolor: this.props.theme.palette.background.neutral,
         }}
       >
+        {error && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {error}
+          </Alert>
+        )}
+        
+        {success && (
+          <Alert severity="success" sx={{ mb: 2 }}>
+            {success}
+          </Alert>
+        )}
+        
+        {loading && (
+          <Box sx={{ display: 'flex', justifyContent: 'center', my: 2 }}>
+            <CircularProgress />
+          </Box>
+        )}
         <Stack
           sx={{
             px: this.props.matchUpMd ? 5 : 2,

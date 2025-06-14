@@ -1,34 +1,22 @@
-/*******************************************************
- *      Server Starts From Here                        *
- *******************************************************/
-"use strict";
+require('dotenv').config();
+const http = require('http');
+const mongoose = require('mongoose');
+const app = require('./app');
 
-require("dotenv").config();
-const http = require("http");
-const app = require("./app");
 const port = process.env.PORT || 4000;
-const env = process.env.ENV || "Development";
-const app_name = process.env.APP_NAME || "Vegan Rob's DAO Server";
 const server = http.createServer(app);
+app.set('PORT_NUMBER', port);
 
-app.set("PORT_NUMBER", port);
+// Mongo
+mongoose
+  .connect(process.env.MONGODB_URI, { useNewUrlParser: true, useUnifiedTopology: true })
+  .then(() => console.log('MongoDB connected'))
+  .catch(console.error);
 
-//  Start the app on the specific interface (and port).
-server.listen(port, () => {
-  const data = new Date();
-  console.log("|--------------------------------------------");
-  console.log("| Server       : " + app_name);
-  console.log("| Environment  : " + env);
-  console.log("| Port         : " + port);
-  console.log("| Date         : " + data.toJSON().split("T").join(" "));
-  console.log("|--------------------------------------------");
-  console.log("| Waiting For Database Connection ");
-});
+// HTTP
+server.listen(port, () => console.log(`Server up on ${port} - ${new Date().toISOString()}`));
 
-process.on("SIGTERM", () => {
-  server.close(() => {
-    process.exit(0);
-  });
-});
+// graceful shutdown
+process.on('SIGTERM', () => server.close(() => process.exit(0)));
 
 module.exports = server;

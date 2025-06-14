@@ -27,6 +27,12 @@ const userReducer = (state = initialState, action) => {
         ...state,
         position: action.payload,
       };
+    case "RESET_ACCOUNT":
+      return {
+        ...state,
+        account: "",
+        position: "GUEST",
+      };
     default:
       return state;
   }

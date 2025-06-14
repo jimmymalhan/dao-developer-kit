@@ -68,13 +68,13 @@ export const Web3Provider = ({ children }) => {
       const clientWeb3 = window.web3;
       const accounts = await clientWeb3.eth.getAccounts();
       setData({ ...data, account: accounts[0] });
-      await this.getPosition(accounts[0]);
+      await getPosition(accounts[0]);
     } else if (window.web3) {
       window.web3 = new Web3(window.web3.currentProvider);
       const clientWeb3 = window.web3;
       const accounts = await clientWeb3.eth.getAccounts();
       setData({ ...data, account: accounts[0] });
-      await this.getPosition(accounts[0]);
+      await getPosition(accounts[0]);
     }
 
     const { ethereum } = window;
@@ -83,9 +83,7 @@ export const Web3Provider = ({ children }) => {
         accounts = web3.utils.toChecksumAddress(accounts + "");
       } catch (err) {}
 
-      this.setState({
-        account: accounts,
-      });
+      setData({ ...data, account: accounts });
     });
 
     ethereum.on("chainChanged", async (chainId) => {
@@ -94,36 +92,22 @@ export const Web3Provider = ({ children }) => {
         params: [{ chainId: web3.utils.toHex(1666600000) }],
       });
     });
-
-    // this.checkDashBoard(this.state.linkedAccount)
   };
 
   const getPosition = async (address) => {
-    const balance = await web3.vrtContract.methods.balanceOf(address).call();
-    const owner = await web3.web3.daoContract.methods.owner().call();
-    const admin = await web3.web3.daoContract.methods.admin().call();
+    const balance = await vrtContract.methods.balanceOf(address).call();
+    const owner = await daoContract.methods.owner().call();
+    const admin = await daoContract.methods.admin().call();
 
     if (address === owner) {
-      this.setState({
-        position: "OWNER",
-      });
-      this.props.dispatch({ type: "SET_POSITION", payload: "OWNER" });
+      setData({ ...data, position: "OWNER" });
     } else if (address === admin) {
-      this.setState({
-        position: "ADMIN",
-      });
-      this.props.dispatch({ type: "SET_POSITION", payload: "ADMIN" });
+      setData({ ...data, position: "ADMIN" });
     } else {
       if (balance > 0) {
-        this.setState({
-          position: "MEMBER",
-        });
-        this.props.dispatch({ type: "SET_POSITION", payload: "MEMBER" });
+        setData({ ...data, position: "MEMBER" });
       } else {
-        this.setState({
-          position: "GUEST",
-        });
-        this.props.dispatch({ type: "SET_POSITION", payload: "GUEST" });
+        setData({ ...data, position: "GUEST" });
       }
     }
   };
